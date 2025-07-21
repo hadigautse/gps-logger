@@ -91,39 +91,50 @@
         const logTableBody = document.getElementById('log-table-body');
 
         // --- App State ---
-        let watchId = null;
+        let intervalId = null;
         let loggedCoordinates = [];
         let deferredInstallPrompt = null;
+        
+        const geoOptions = {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
+        };
 
         // --- Geolocation Logic ---
 
-        // Function to start watching the user's position
+        // Function to request the current position
+        const fetchPosition = () => {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(positionSuccess, positionError, geoOptions);
+            }
+        };
+        
+        // Function to start logging every 10 seconds
         const startLogging = () => {
             if (navigator.geolocation) {
-                statusDiv.textContent = 'Status: Acquiring position...';
-                watchId = navigator.geolocation.watchPosition(
-                    positionSuccess,
-                    positionError,
-                    {
-                        enableHighAccuracy: true,
-                        timeout: 10000,
-                        maximumAge: 0
-                    }
-                );
+                statusDiv.textContent = 'Status: Starting...';
+                
+                // Fetch the first position immediately, then set an interval to fetch it every 10 seconds.
+                fetchPosition();
+                intervalId = setInterval(fetchPosition, 10000);
+
                 // Update UI state
                 startBtn.disabled = true;
                 stopBtn.disabled = false;
                 downloadBtn.disabled = true;
+                loggedCoordinates = []; // Clear previous log
+                logTableBody.innerHTML = ''; // Clear table
             } else {
                 statusDiv.textContent = 'Geolocation is not supported by your browser.';
             }
         };
 
-        // Function to stop watching the user's position
+        // Function to stop logging
         const stopLogging = () => {
-            if (watchId !== null) {
-                navigator.geolocation.clearWatch(watchId);
-                watchId = null;
+            if (intervalId !== null) {
+                clearInterval(intervalId); // Use clearInterval to stop the interval
+                intervalId = null;
                 statusDiv.textContent = 'Status: Idle';
                 // Update UI state
                 startBtn.disabled = false;
@@ -134,7 +145,7 @@
             }
         };
 
-        // Success callback for watchPosition
+        // Success callback for getCurrentPosition
         const positionSuccess = (position) => {
             const { latitude, longitude } = position.coords;
             const timestamp = new Date(position.timestamp);
@@ -162,22 +173,22 @@
             `;
         };
 
-        // Error callback for watchPosition
+        // Error callback for getCurrentPosition
         const positionError = (error) => {
             let errorMessage = 'An unknown error occurred.';
             switch (error.code) {
                 case error.PERMISSION_DENIED:
                     errorMessage = 'User denied the request for Geolocation.';
+                    stopLogging(); // Stop logging entirely if permission is denied
                     break;
                 case error.POSITION_UNAVAILABLE:
-                    errorMessage = 'Location information is unavailable.';
+                    errorMessage = 'Location information is unavailable. Retrying in 10s...';
                     break;
                 case error.TIMEOUT:
-                    errorMessage = 'The request to get user location timed out.';
+                    errorMessage = 'The request to get user location timed out. Retrying in 10s...';
                     break;
             }
             statusDiv.textContent = `Error: ${errorMessage}`;
-            stopLogging(); // Stop trying if there's an error
         };
 
         // --- Data Download Logic ---
@@ -185,7 +196,8 @@
         // Function to download logged data as a CSV file
         const downloadLog = () => {
             if (loggedCoordinates.length === 0) {
-                alert('No data to download.');
+                // This alert is a fallback, but a more integrated UI message would be better.
+                statusDiv.textContent = 'No data to download.';
                 return;
             }
 
