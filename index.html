@@ -149,7 +149,13 @@
         const positionSuccess = (position) => {
             const { latitude, longitude } = position.coords;
             const timestamp = new Date(position.timestamp);
-            const formattedTime = timestamp.toLocaleTimeString();
+            
+            // Format time to exclude seconds, making the 10-second interval clearer.
+            const formattedTime = timestamp.toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+            });
 
             // Update current location display
             latitudeSpan.textContent = latitude.toFixed(6);
